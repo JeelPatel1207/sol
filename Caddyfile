@@ -1,0 +1,29 @@
+# Caddyfile – Automatic HTTPS with reverse proxy & static asset serving
+{$APP_DOMAIN:localhost} {
+    # Encode with gzip and zstd
+    encode zstd gzip
+
+    # Reverse proxy API requests to the Node.js backend
+    handle /api/* {
+        reverse_proxy server:4000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+        }
+    }
+
+    # Serve built PWA frontend
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Security Headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+}

@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: solar_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-solar_monitor}
+      POSTGRES_USER: ${POSTGRES_USER:-solar_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres-password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-solar_user} -d ${POSTGRES_DB:-solar_monitor}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - solar_net
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: solar_server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-solar_user}:${POSTGRES_PASSWORD:-change-me-postgres-password}@postgres:5432/${POSTGRES_DB:-solar_monitor}
+    networks:
+      - solar_net
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: solar_web_builder
+    restart: "no"
+    volumes:
+      - web_dist:/target
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: solar_caddy
+    restart: unless-stopped
+    depends_on:
+      - server
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - web_dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - solar_net
+
+volumes:
+  pgdata:
+  web_dist:
+  caddy_data:
+  caddy_config:
+
+networks:
+  solar_net:
+    driver: bridge

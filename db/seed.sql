@@ -1,0 +1,2 @@
+-- Placeholder seed file (1 admin + 1 demo plant) - implemented in later phases
+-- Phase 1 & 2 will populate actual initial records
